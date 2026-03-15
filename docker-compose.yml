@@ -1,13 +1,16 @@
+x-common-env: &common-env
+  GEMINI_API_KEY: ${GEMINI_API_KEY}
+  COLLECTION_NAME: ${COLLECTION_NAME}
+  QDRANT_HOST: ${QDRANT_HOST}
+  QDRANT_PORT: ${QDRANT_PORT}
+  POSTGRES_DB: ${POSTGRES_DB}
+  POSTGRES_USER: ${POSTGRES_USER}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  POSTGRES_HOST: ${POSTGRES_HOST}
+  POSTGRES_PORT: ${POSTGRES_PORT}
 
-environment: &common-env
-  - GEMINI_API_KEY=${GEMINI_API_KEY}
-  - POSTGRESQL_DB_HOST=${POSTGRESQL_DB_HOST}
-  - POSTGRESQL_DB_PORT=${POSTGRESQL_DB_PORT}
-  - COLLECTION_NAME=${COLLECTION_NAME}
-  - QDRANT_HOST=${CHROMA_DB_HOST}
-  - QDRANT_PORT=${CHROMA_DB_PORT}
 services:
-  alangchain:
+  langchain:
     build: .
     container_name: langchain
     command: tail -f /dev/null
@@ -16,6 +19,23 @@ services:
     environment:
       <<: *common-env
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: poc_trading_db
+    restart: always
+    environment:
+      <<: *common-env
+    ports:
+      - "5432:5432"
+    volumes:
+      - rag_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+
   qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant_service
@@ -23,7 +43,7 @@ services:
       - "6333:6333"
       - "6334:6334" 
     volumes:
-      - qdrant_data:/qdrant/storage:z
+      - rag_data:/qdrant/storage:z
     environment:
       <<: *common-env
       QDRANT__SERVICE__ENABLE_STATIC_CONTENT: 1
@@ -35,5 +55,5 @@ services:
           memory: 500m
 
 volumes:
-  qdrant_data:
+  rag_data:
     driver: local
