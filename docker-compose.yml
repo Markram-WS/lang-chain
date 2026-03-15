@@ -1,0 +1,39 @@
+
+environment: &common-env
+  - GEMINI_API_KEY=${GEMINI_API_KEY}
+  - POSTGRESQL_DB_HOST=${POSTGRESQL_DB_HOST}
+  - POSTGRESQL_DB_PORT=${POSTGRESQL_DB_PORT}
+  - COLLECTION_NAME=${COLLECTION_NAME}
+  - QDRANT_HOST=${CHROMA_DB_HOST}
+  - QDRANT_PORT=${CHROMA_DB_PORT}
+services:
+  alangchain:
+    build: .
+    container_name: langchain
+    command: tail -f /dev/null
+    volumes:
+      - ./app/:/app/langchain/
+    environment:
+      <<: *common-env
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant_service
+    ports:
+      - "6333:6333"
+      - "6334:6334" 
+    volumes:
+      - qdrant_data:/qdrant/storage:z
+    environment:
+      <<: *common-env
+      QDRANT__SERVICE__ENABLE_STATIC_CONTENT: 1
+
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 500m
+
+volumes:
+  qdrant_data:
+    driver: local

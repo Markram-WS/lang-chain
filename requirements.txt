@@ -1,0 +1,17 @@
+python-dotenv == 1.2.2
+langchain
+langchain-community
+langchain-google-genai
+duckduckgo-search 
+google-genai
+langgraph-checkpoint-postgres
+langchain-elasticsearch
+langchain-text-splitters
+langchain-qdrant
+yfinance  
+sentence-transformers 
+pandas
+feedparser
+requests
+beautifulsoup4
+qdrant-client
