@@ -15,7 +15,7 @@ services:
     container_name: langchain
     command: tail -f /dev/null
     volumes:
-      - ./app/:/app/langchain/
+      - ./app/:/app/
     environment:
       <<: *common-env
 
@@ -28,7 +28,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - rag_data:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql/data
     deploy:
       resources:
         limits:
@@ -43,7 +43,7 @@ services:
       - "6333:6333"
       - "6334:6334" 
     volumes:
-      - rag_data:/qdrant/storage:z
+      - qdrant_data:/qdrant/storage:z
     environment:
       <<: *common-env
       QDRANT__SERVICE__ENABLE_STATIC_CONTENT: 1
@@ -55,5 +55,7 @@ services:
           memory: 500m
 
 volumes:
-  rag_data:
+  pg_data:
+    driver: local
+  qdrant_data:
     driver: local

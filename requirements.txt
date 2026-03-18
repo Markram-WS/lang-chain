@@ -143,3 +143,5 @@ yarl==1.23.0
 yfinance==1.2.0
 zstandard==0.25.0
 lxml
+sqlalchemy 
+psycopg2-binary
