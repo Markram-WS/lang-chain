@@ -22,7 +22,7 @@ class TradingURL:
 
     def col_commodities(self, x):
         return {
-            x: "product",
+            x: "asset_class",
             "Day": "change_val",
             "%": "day_pct",
             "Price": "price",
@@ -35,7 +35,7 @@ class TradingURL:
 
     def col_stocks(self, x):
         return {
-            x: "product",
+            x: "asset_class",
             "Day": "change_val",
             "%": "day_pct",
             "Price": "price",
@@ -48,7 +48,21 @@ class TradingURL:
 
     def col_currencies(self, x):
         return {
-            x: "product",
+            x: "asset_class",
+            "Day": "change_val",
+            "%": "day_pct",
+            "Price": "price",
+            "Weekly": "weekly",
+            "Monthly": "monthly",
+            "YTD": "ytd",
+            "YoY": "yoy",
+            "MarketCap": "marketcap",
+            "Date": "date",
+        }
+
+    def col_crypto(self, x):
+        return {
+            x: "asset_class",
             "Day": "change_val",
             "%": "day_pct",
             "Price": "price",
@@ -62,7 +76,7 @@ class TradingURL:
 
     def col_bonds(self, x):
         return {
-            x: "product",
+            x: "asset_class",
             "Yield": "yield",
             "Day": "change_val",
             "%": "day_pct",

@@ -5,8 +5,9 @@ from bs4 import BeautifulSoup
 import io
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
-from model import TradingURL
+import numpy as np
 import datetime as dt
+from model import TradingURL
 
 # Load environment variables from .env file
 load_dotenv()
@@ -43,10 +44,13 @@ def get_trading_economics_all_groups(url):
     trading = TradingURL()
     for table in soup.find_all("table"):
         table_text = table.get_text()
-        if "Price" in table_text and "Weekly" in table_text:
+        if "YTD" in table_text and "Weekly" in table_text:
             df_tmp = pd.read_html(io.StringIO(str(table)))[0]
 
-            # เก็บชื่อกลุ่ม (เช่น Energy) จากชื่อคอลัมน์แรกสุด
+            for c in df_tmp.columns:
+                if "Unnamed" in c:
+                    df_tmp = df_tmp.drop(columns=[c])
+
             group_name = df_tmp.columns[0]
 
             # Rename คอลัมน์ให้เป็นมาตรฐาน
@@ -56,11 +60,14 @@ def get_trading_economics_all_groups(url):
             df_tmp["asset_class"] = group_name
 
             if "yield" not in df_tmp.columns:
-                df_tmp["yield"] = pd.NA
+                df_tmp["yield"] = np.nan
             if "marketcap" not in df_tmp.columns:
-                df_tmp["marketcap"] = pd.NA
+                df_tmp["marketcap"] = np.nan
 
             all_tables.append(df_tmp)
+
+            if group_name == "Crypto":
+                break
 
     if all_tables:
         df = pd.concat(all_tables, ignore_index=True)
@@ -81,50 +88,69 @@ def get_trading_economics_all_groups(url):
 
         for col in numeric_cols:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
-    return all_tables
+                df[col] = df[col].replace({np.nan: None})
+                if df[col].dtype == "object" or df[col].dtype == "str":
+                    df[col] = df[col].str.replace(",", "", regex=False)
+                    df[col] = (
+                        df[col].str.replace("%", "", regex=False).astype(float) / 100
+                    )
+                else:
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
 
+        # if 'marketcap' in df.columns:
+        #     df['marketcap'] = df['marketcap'].str.replace('$', '', regex=False)
+        #     df['marketcap'] = df['marketcap'].str.replace(',', '', regex=False)
 
-def upsert(df):
-    if df is None or df.empty:
-        print("SKIP")
+        return df
     else:
-        user = os.getenv("POSTGRES_USER", "user")
-        password = os.getenv("POSTGRES_PASSWORD", "pass")
-        host = os.getenv("POSTGRES_HOST", "localhost")
-        port = os.getenv("POSTGRES_PORT", "5432")
-        db = os.getenv("POSTGRES_DB", "market_db")
+        return None
 
-        engine = create_engine(f"postgresql://{user}:{password}@{host}:{port}/{db}")
 
-        # --- 3. Ensure table exists ---
-        with engine.begin() as conn:
-            conn.execute(
-                text("""
-                CREATE TABLE IF NOT EXISTS market_stats (
-                    asset_class TEXT,
-                    yield FLOAT,
-                    change_val FLOAT,
-                    day_pct FLOAT,
-                    price FLOAT,
-                    weekly FLOAT,
-                    monthly FLOAT,
-                    marketcap FLOAT,
-                    ytd FLOAT,
-                    yoy FLOAT,
-                    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-            )
-            conn.execute(
-                text("""
-                truncate table market_stats;
-            """)
-            )
+def db_conn():
+    user = os.getenv("POSTGRES_USER", "user")
+    password = os.getenv("POSTGRES_PASSWORD", "pass")
+    host = os.getenv("POSTGRES_HOST", "localhost")
+    port = os.getenv("POSTGRES_PORT", "5432")
+    db = os.getenv("POSTGRES_DB", "market_db")
 
+    return create_engine(f"postgresql://{user}:{password}@{host}:{port}/{db}")
+
+
+def setup(engine):
+    with engine.begin() as conn:
+        conn.execute(
+            text("""
+            CREATE TABLE IF NOT EXISTS market_stats (
+                asset_class TEXT,
+                yield FLOAT,
+                change_val FLOAT,
+                day_pct FLOAT,
+                price FLOAT,
+                weekly FLOAT,
+                monthly FLOAT,
+                marketcap TEXT,
+                ytd FLOAT,
+                yoy FLOAT,
+                date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        )
+
+        conn.execute(
+            text("""
+            truncate table market_stats;
+        """)
+        )
+
+
+def upsert(df, engine):
+    if len(df):
         # --- 4. Insert using UPSERT (SQLAlchemy) ---
-        df.to_sql(name="market_stats", con=engine, if_exists="append")
-        print(f"Successfully upserted {len(df)} records to Postgres.")
+        with engine.begin() as conn:
+            df.to_sql(name="market_stats", con=engine, if_exists="append", index=False)
+            print(f"Successfully upserted {len(df)} records to Postgres.")
+    else:
+        print("SKIP")
 
 
 if __name__ == "__main__":
@@ -135,7 +161,13 @@ if __name__ == "__main__":
         "https://tradingeconomics.com/crypto",
         "https://tradingeconomics.com/bonds",
     ]
-    for g in groups:
+
+    for g in groups[:]:
         print(f"process : {g}")
         data = get_trading_economics_all_groups(g)
-        upsert(data)
+        if len(data):
+            eng = db_conn()
+            setup(eng)
+            upsert(data, eng)
+        else:
+            print("get_trading_economics Null")
